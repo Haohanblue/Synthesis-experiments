@@ -8,13 +8,13 @@ class Program2Frame(ttk.Frame):
     def __init__(self, parent, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.cities = [
-            {"id": "54c78c101bf42f56b14a91ee", "name": "成都", "L": "", "H": "", "HURL": "", "LURL": ""},
-            {"id": "54c78e5c1bf42f56b14a93cb", "name": "亚洲", "L": "", "H": "", "HURL": "", "LURL": ""},
-            {"id": "54bdea47eb048d9802ef3e89", "name": "武汉", "L": "", "H": "", "HURL": "", "LURL": ""},
-            {"id": "54acef16eb04d4137be47d8c", "name": "北京", "L": "", "H": "", "HURL": "", "LURL": ""},
-            {"id": "54c78cb91bf42f56b14a9203", "name": "深圳", "L": "", "H": "", "HURL": "", "LURL": ""},
-            {"id": "54c78ce91bf42f56b14a920b", "name": "大连", "L": "", "H": "", "HURL": "", "LURL": ""},
-            {"id": "54c78c771bf42f56b14a91f5", "name": "沈阳", "L": "", "H": "", "HURL": "", "LURL": ""}
+            {"id": "54c78c101bf42f56b14a91ee", "name": "成都", "L": "", "H": "", "HURL": "", "LURL": "", "power": ""},
+            {"id": "54c78e5c1bf42f56b14a93cb", "name": "亚洲", "L": "", "H": "", "HURL": "", "LURL": "", "power": ""},
+            {"id": "54bdea47eb048d9802ef3e89", "name": "武汉", "L": "", "H": "", "HURL": "", "LURL": "", "power": ""},
+            {"id": "54acef16eb04d4137be47d8c", "name": "北京", "L": "", "H": "", "HURL": "", "LURL": "", "power": ""},
+            {"id": "54c78cb91bf42f56b14a9203", "name": "深圳", "L": "", "H": "", "HURL": "", "LURL": "", "power": ""},
+            {"id": "54c78ce91bf42f56b14a920b", "name": "大连", "L": "", "H": "", "HURL": "", "LURL": "", "power": ""},
+            {"id": "54c78c771bf42f56b14a91f5", "name": "沈阳", "L": "", "H": "", "HURL": "", "LURL": "", "power": ""}
         ]
         self.auto_update_id = None
         self.countdown = 5
@@ -27,6 +27,38 @@ class Program2Frame(ttk.Frame):
         self.output_text.insert('end', message + '\n')
         self.output_text.configure(state='disabled')
         self.output_text.yview('end')
+
+    def fetch_power_data(self):
+        for city in self.cities:
+            city_id = city['id']
+            url = f"http://202.115.122.139:8080/crossm/game/area/gen/mine/{city_id}"
+            cookie_value = self.cookie_entry.get()
+            headers = {
+                'Cookie': cookie_value.strip(),
+            }
+            response = requests.post(url,headers=headers)
+            if response.status_code == 200:
+                try:
+                    data = response.json().get('data', [])
+                    my_company = next((item for item in data if item['name'] == "我的企业"), None)
+                    other_companies = next((item for item in data if item['name'] == "其他企业"), None)
+                    if my_company and other_companies:
+                        my_value = my_company['value']
+                        other_value = other_companies['value']
+                        if other_value != 0:
+                            power_percentage = (my_value / (my_value + other_value)) * 100
+                            city['power'] = f"{power_percentage:.2f}%"
+                        else:
+                            city['power'] = "100.00%"
+                    else:
+                        city['power'] = "N/A"
+                except ValueError:
+                    self.print_to_gui(f"JSON解析错误: {response.text}")
+                    city['power'] = "Error"
+            else:
+                self.print_to_gui(f"请求失败: {response.status_code}")
+                city['power'] = "Error"
+            self.tree.item(city['id'], values=(city['name'], city['H'], city['L'], city['power']))
 
     def submit_data(self):
         for city_id, (h_entry, l_entry) in self.entries.items():
@@ -102,7 +134,7 @@ class Program2Frame(ttk.Frame):
                         city['H'] = h_remain_span.text.split(':')[1].strip()
                         total_H += int(city['H'])
 
-            self.tree.item(city['id'], values=(city['name'], city['H'], city['L']))
+            self.tree.item(city['id'], values=(city['name'], city['H'], city['L'], city['power']))
             sales_divs = soup.find_all('div', attrs={'data-title': 'H型产品销售数据统计'})
             if sales_divs:
                 city['HURL'] = sales_divs[0].get('id', '')[4:]
@@ -111,24 +143,27 @@ class Program2Frame(ttk.Frame):
             if sales_divs:
                 city['LURL'] = sales_divs[0].get('id', '')[4:]
 
-            self.tree.item(city['id'], values=(city['name'], city['H'], city['L']))
+            self.tree.item(city['id'], values=(city['name'], city['H'], city['L'], city['power']))
         self.tree.item('total', values=("合计", total_H, total_L))
+        self.fetch_power_data()  # Fetch power data after updating
         self.manage_timer(start=True)
 
     def create_widgets(self):
         self.main_frame = ttk.Frame(self.master)
-        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         self.tree_frame = ttk.Frame(self.main_frame)
         self.tree_frame.pack(side='left', fill=tk.BOTH, expand=True)
 
-        self.tree = ttk.Treeview(self.tree_frame, columns=('City', 'H', 'L'), show='headings')
+        self.tree = ttk.Treeview(self.tree_frame, columns=('City', 'H', 'L', 'Power'), show='headings')
         self.tree.heading('City', text='城市', anchor='center')
         self.tree.heading('H', text='H型', anchor='center')
         self.tree.heading('L', text='L型', anchor='center')
+        self.tree.heading('Power', text='影响力', anchor='center')
         self.tree.column('City', anchor='center')
         self.tree.column('H', anchor='center')
         self.tree.column('L', anchor='center')
+        self.tree.column('Power', anchor='center')
         self.tree.pack(side='left', fill=tk.BOTH, expand=True)
 
         self.scrollbar = ttk.Scrollbar(self.tree_frame, orient="vertical", command=self.tree.yview)
@@ -154,10 +189,10 @@ class Program2Frame(ttk.Frame):
             self.entries[city['id']] = (h_entry, l_entry)
 
         for city in self.cities:
-            entry_h = ttk.Entry(self.master, width=10)
-            entry_l = ttk.Entry(self.master, width=10)
-            self.tree.insert('', 'end', iid=city['id'], values=(city['name'], city['L'], city['H'], entry_h, entry_l))
-        self.tree.insert('', 'end', iid='total', values=("合计", "", "", "", ""))
+            entry_h = ttk.Entry(self.master, width=5)
+            entry_l = ttk.Entry(self.master, width=5)
+            self.tree.insert('', 'end', iid=city['id'], values=(city['name'], city['L'], city['H'], city['power']))
+        self.tree.insert('', 'end', iid='total', values=("合计", "", "", ""))
 
         self.cookie_label = ttk.Label(self.master, text="请输入Cookie:")
         self.cookie_label.pack()
@@ -176,10 +211,13 @@ class Program2Frame(ttk.Frame):
         self.countdown_label.pack()
 
         self.output_frame = ttk.Frame(self.master)
-        self.output_frame.pack(fill='x', expand=False)
-        self.output_text = scrolledtext.ScrolledText(self.output_frame, height=10, state='disabled')
+        self.output_frame.pack(fill='x', expand=True)
+        self.output_text = scrolledtext.ScrolledText(self.output_frame, height=20, state='disabled')
         self.output_text.pack(fill='both', expand=True, padx=5, pady=5)
 
         self.manage_timer(start=True)
 
-
+if __name__ == "__main__":
+    root = tk.Tk()
+    Program2Frame(root).pack(fill="both", expand=True)
+    root.mainloop()

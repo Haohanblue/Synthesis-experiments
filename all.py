@@ -7,7 +7,7 @@ class MainApplication(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title('综合实验处理脚本')
-        self.geometry('900x600')
+        self.geometry('1200x800')
 
         self.tab_control = ttk.Notebook(self)
         self.tab_control.pack(expand=1, fill="both")
