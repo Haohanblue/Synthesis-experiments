@@ -4,7 +4,7 @@ import tkinter.ttk as ttk
 def get_score(base_price, base_score):
     for price in range(base_price, base_price + 1500):
         S_total = base_score - 10 * (price - base_price) / (0.01 * base_price)
-        if S_total <= -5:
+        if S_total <= 0:
             return price - 1
     return base_price + 1500 - 1  # 如果循环完成没有低于-5的情况
 
