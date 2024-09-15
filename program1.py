@@ -21,6 +21,7 @@ class Program1Frame(ttk.Frame):
 
         ttk.Button(self.parent, text='收集产品', command=self.run_collect_products).pack(pady=10)
         ttk.Button(self.parent, text='支付租金', command=self.run_pay_all_rents).pack(pady=10)
+        ttk.Button(self.parent, text='支付扩建', command=self.run_pay_all_areas).pack(pady=10)
 
     def run_collect_products(self):
         cookie = self.cookie_entry.get()
@@ -33,6 +34,12 @@ class Program1Frame(ttk.Frame):
         headers = {'Cookie': f'{cookie}'}
         headers = {k: v.strip() for k, v in headers.items()}
         self.pay_all_rents(headers)
+
+    def run_pay_all_areas(self):
+        cookie = self.cookie_entry.get()
+        headers = {'Cookie': f'{cookie}'}
+        headers = {k: v.strip() for k, v in headers.items()}
+        self.pay_all_areas(headers)
 
     def collect_products(self, headers):
         html_content = self.get_order_html(headers)
@@ -88,3 +95,34 @@ class Program1Frame(ttk.Frame):
                 event_id = event_link.split('/')[-1]
                 rent_list.append(event_id)
         return rent_list
+    
+    def parse_area_payment(self,html_content):
+        soup = BeautifulSoup(html_content, 'html.parser')
+        area_list = []
+        rows = soup.find_all('tr', class_="success")
+        for row in rows:
+            first_td_text = row.find('td', class_="col-md-8").text
+            if first_td_text.endswith("扩建大型厂区"):
+                event_link = row.find('a', href=True)['href']
+                event_id = event_link.split('/')[-1]
+                area_list.append(event_id)
+        return area_list
+    
+    def pay_all_areas(self, headers):
+        html_content = self.get_order_html(headers)
+        area_ids = self.parse_area_payment(html_content)
+        print(area_ids)
+        for area_id in area_ids:
+            url = f"http://202.115.122.139:8080/crossm/game/pay/event/active/{area_id}"
+            data2 = {
+                "id": area_id,
+                "account": "655351028418126422",
+                "secondPartyAccounts": "655350830356683470"
+            }
+            response = requests.post(url, headers=headers,data=data2)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            alerts = soup.find_all(class_='alert')
+            content = alerts[0].get_text() if alerts else response.text
+            self.output.insert(tk.END, f"Requested {area_id} {content} 完成\n")
+            self.output.see(tk.END)
+            time.sleep(0.01)
